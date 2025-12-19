@@ -97,7 +97,10 @@ impl StakeCommand {
                 )
                 .await?;
             }
-            StakeCommand::Merge => todo!(),
+            StakeCommand::Merge => {
+                show_spinner(self.spinner_msg(), process_merge_stake(ctx)).await?;
+                todo!()
+            }
             StakeCommand::Split => todo!(),
             StakeCommand::Show => todo!(),
             StakeCommand::History => {
