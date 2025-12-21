@@ -1,5 +1,8 @@
 use {
-    crate::{constants::SCILLA_CONFIG_RELATIVE_PATH, error::ScillaError},
+    crate::{
+        constants::{DEFAULT_KEYPAIR_PATH, DEVNET_RPC, SCILLA_CONFIG_RELATIVE_PATH},
+        error::ScillaError,
+    },
     serde::{Deserialize, Serialize},
     solana_commitment_config::CommitmentLevel,
     std::{env::home_dir, fs, path::PathBuf},
@@ -39,13 +42,55 @@ pub struct ScillaConfig {
     pub keypair_path: PathBuf,
 }
 
-impl ScillaConfig {
-    pub fn load() -> Result<ScillaConfig, ScillaError> {
-        let scilla_config_path = scilla_config_path();
-        println!("Using Scilla config path : {scilla_config_path:?}");
-        if !scilla_config_path.exists() {
-            return Err(ScillaError::ConfigPathDoesntExists);
+impl Default for ScillaConfig {
+    fn default() -> Self {
+        let default_keypair_path = home_dir()
+            .expect("Could not determine home directory")
+            .join(DEFAULT_KEYPAIR_PATH);
+
+        Self {
+            rpc_url: DEVNET_RPC.to_string(),
+            commitment_level: CommitmentLevel::Confirmed,
+            keypair_path: default_keypair_path,
         }
+    }
+}
+
+impl ScillaConfig {
+    pub async fn load() -> Result<ScillaConfig, ScillaError> {
+        let scilla_config_path = scilla_config_path();
+
+        if !scilla_config_path.exists() {
+            use console::style;
+
+            println!(
+                "\n{}",
+                style("No configuration file found!").yellow().bold()
+            );
+            println!(
+                "{}",
+                style(format!(
+                    "Creating config at: {}",
+                    scilla_config_path.display()
+                ))
+                .cyan()
+            );
+            println!(
+                "{}",
+                style("Let's set up your configuration to get started.\n").cyan()
+            );
+
+            crate::commands::config::generate_config().await?;
+
+            println!(
+                "\n{}",
+                style("Configuration complete! Starting Scilla...\n")
+                    .green()
+                    .bold()
+            );
+        }
+
+        println!("Using Scilla config path : {scilla_config_path:?}");
         let data = fs::read_to_string(scilla_config_path)?;
         let config: ScillaConfig = toml::from_str(&data)?;
         Ok(config)
