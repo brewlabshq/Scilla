@@ -2,19 +2,23 @@ use {
     crate::{
         commands::{
             account::AccountCommand, cluster::ClusterCommand, config::ConfigCommand,
-            stake::StakeCommand, vote::VoteCommand,
+            stake::StakeCommand, transaction::TransactionCommand, vote::VoteCommand,
         },
         context::ScillaContext,
         error::ScillaResult,
     },
     console::style,
-    std::process::{ExitCode, Termination},
+    std::{
+        fmt,
+        process::{ExitCode, Termination},
+    },
 };
 
 pub mod account;
 pub mod cluster;
 pub mod config;
 pub mod stake;
+pub mod transaction;
 pub mod vote;
 
 pub enum CommandExec<T> {
@@ -36,6 +40,7 @@ pub enum Command {
     Stake(StakeCommand),
     Account(AccountCommand),
     Vote(VoteCommand),
+    Transaction(TransactionCommand),
     ScillaConfig(ConfigCommand),
     Exit,
 }
@@ -47,8 +52,37 @@ impl Command {
             Command::Stake(stake_command) => stake_command.process_command(ctx).await,
             Command::Account(account_command) => account_command.process_command(ctx).await,
             Command::Vote(vote_command) => vote_command.process_command(ctx).await,
-            Command::ScillaConfig(_config_command) => todo!(),
+            Command::Transaction(transaction_command) => {
+                transaction_command.process_command(ctx).await
+            }
+            Command::ScillaConfig(config_command) => config_command.process_command(),
             Command::Exit => Ok(CommandExec::Exit),
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum CommandGroup {
+    Account,
+    Cluster,
+    Stake,
+    Vote,
+    Transaction,
+    ScillaConfig,
+    Exit,
+}
+
+impl fmt::Display for CommandGroup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let command = match self {
+            CommandGroup::Account => "Account",
+            CommandGroup::Cluster => "Cluster",
+            CommandGroup::Stake => "Stake",
+            CommandGroup::Vote => "Vote",
+            CommandGroup::Transaction => "Transaction",
+            CommandGroup::ScillaConfig => "ScillaConfig",
+            CommandGroup::Exit => "Exit",
+        };
+        write!(f, "{command}")
     }
 }
