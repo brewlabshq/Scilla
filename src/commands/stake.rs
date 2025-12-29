@@ -141,7 +141,7 @@ impl StakeCommand {
                 .await?;
             }
             StakeCommand::Show => {
-                let pubkey: Pubkey = prompt_data("Enter Stake Account Pubkey:")?;
+                let stake_acc_pubkey: Pubkey = prompt_data("Enter Stake Account Pubkey:")?;
                 show_spinner(self.spinner_msg(), show_stake_account(ctx, &pubkey)).await?;
             }
             StakeCommand::History => {
