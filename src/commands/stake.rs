@@ -1,7 +1,7 @@
 use {
     crate::{
-        commands::CommandExec, constants::LAMPORTS_PER_SOL, context::ScillaContext,
-        error::ScillaResult, prompt::prompt_data, ui::show_spinner,
+        commands::CommandExec, context::ScillaContext,
+        error::ScillaResult, misc::helpers::lamports_to_sol, prompt::prompt_data, ui::show_spinner,
     },
     bincode,
     comfy_table::{Cell, Table, presets::UTF8_FULL},
@@ -14,7 +14,6 @@ use {
         state::{Meta, StakeActivationStatus, StakeStateV2},
     },
     solana_sysvar::clock,
-    std::ops::Div,
 };
 
 /// Commands related to staking operations
@@ -73,27 +72,16 @@ async fn show_stake_account(ctx: &ScillaContext, pubkey: &Pubkey) -> anyhow::Res
         .get_multiple_accounts(&[*pubkey, stake_history::id(), clock::id()])
         .await?;
 
-    let stake_account = match accounts.get(0) {
-        Some(account) => match account {
-            Some(data) => data,
-            None => return Err(anyhow::anyhow!("Failed to get stake account data")),
-        },
-        None => return Err(anyhow::anyhow!("Failed to get stake account")),
+    let Some(Some(stake_account)) = accounts.get(0) else {
+        anyhow::bail!("Failed to get stake account");
     };
 
-    let stake_history_account = match accounts.get(1) {
-        Some(account) => match account {
-            Some(data) => data,
-            None => return Err(anyhow::anyhow!("Failed to get stake history account data")),
-        },
-        None => return Err(anyhow::anyhow!("Failed to get stake history account")),
+    let Some(Some(stake_history_account)) = accounts.get(1) else {
+        anyhow::bail!("Failed to get stake history account");
     };
-    let clock_account = match accounts.get(2) {
-        Some(account) => match account {
-            Some(data) => data,
-            None => return Err(anyhow::anyhow!("Failed to get clock account data")),
-        },
-        None => return Err(anyhow::anyhow!("Failed to get clock account")),
+
+    let Some(Some(clock_account)) = accounts.get(2) else {
+        anyhow::bail!("Failed to get clock account");
     };
 
     let stake_history: StakeHistory = bincode::deserialize(&stake_history_account.data)
@@ -124,11 +112,11 @@ async fn show_stake_account(ctx: &ScillaContext, pubkey: &Pubkey) -> anyhow::Res
         ])
         .add_row(vec![
             Cell::new("Account Balance (Lamports)"),
-            Cell::new(format!("{}", stake_account.lamports)),
+            Cell::new(stake_account.lamports.to_string()),
         ])
         .add_row(vec![
             Cell::new("Rent Epoch"),
-            Cell::new(format!("{}", stake_account.rent_epoch)),
+            Cell::new(stake_account.rent_epoch.to_string()),
         ]);
 
     // Add stake state specific information
@@ -145,7 +133,7 @@ async fn show_stake_account(ctx: &ScillaContext, pubkey: &Pubkey) -> anyhow::Res
                 .add_row(vec![Cell::new("Stake State"), Cell::new("Initialized")])
                 .add_row(vec![
                     Cell::new("Rent Exempt Reserve (Lamports)"),
-                    Cell::new(format!("{:.9}", rent_exempt_reserve)),
+                    Cell::new(rent_exempt_reserve.to_string()),
                 ])
                 .add_row(vec![
                     Cell::new("Stake Authority"),
@@ -160,11 +148,11 @@ async fn show_stake_account(ctx: &ScillaContext, pubkey: &Pubkey) -> anyhow::Res
                 table
                     .add_row(vec![
                         Cell::new("Lockup Epoch"),
-                        Cell::new(format!("{}", lockup.epoch)),
+                        Cell::new(lockup.epoch.to_string()),
                     ])
                     .add_row(vec![
                         Cell::new("Lockup Unix Timestamp"),
-                        Cell::new(format!("{}", lockup.unix_timestamp)),
+                        Cell::new(lockup.unix_timestamp.to_string()),
                     ])
                     .add_row(vec![
                         Cell::new("Lockup Custodian"),
@@ -206,15 +194,12 @@ async fn show_stake_account(ctx: &ScillaContext, pubkey: &Pubkey) -> anyhow::Res
                 ])
                 .add_row(vec![
                     Cell::new("Delegated Stake (SOL)"),
-                    Cell::new(format!(
-                        "{:.9}",
-                        (stake.delegation.stake as f64).div(LAMPORTS_PER_SOL as f64)
-                    )),
+                    Cell::new(lamports_to_sol(stake.delegation.stake).to_string()),
                 ])
                 .add_row(vec![
                     Cell::new("Activation Epoch"),
                     Cell::new(if stake.delegation.activation_epoch < u64::MAX {
-                        format!("{}", stake.delegation.activation_epoch)
+                        stake.delegation.activation_epoch.to_string()
                     } else {
                         "N/A".to_string()
                     }),
@@ -222,46 +207,37 @@ async fn show_stake_account(ctx: &ScillaContext, pubkey: &Pubkey) -> anyhow::Res
                 .add_row(vec![
                     Cell::new("Deactivation Epoch"),
                     Cell::new(if stake.delegation.deactivation_epoch < u64::MAX {
-                        format!("{}", stake.delegation.deactivation_epoch)
+                        stake.delegation.deactivation_epoch.to_string()
                     } else {
                         "N/A".to_string()
                     }),
                 ])
                 .add_row(vec![
                     Cell::new("Active Stake (SOL)"),
-                    Cell::new(format!(
-                        "{:.9}",
-                        (effective as f64).div(LAMPORTS_PER_SOL as f64)
-                    )),
+                    Cell::new(lamports_to_sol(effective).to_string()),
                 ])
                 .add_row(vec![
                     Cell::new("Activating Stake (SOL)"),
-                    Cell::new(format!(
-                        "{:.9}",
-                        (activating as f64).div(LAMPORTS_PER_SOL as f64)
-                    )),
+                    Cell::new(lamports_to_sol(activating).to_string()),
                 ])
                 .add_row(vec![
                     Cell::new("Deactivating Stake (SOL)"),
-                    Cell::new(format!(
-                        "{:.9}",
-                        (deactivating as f64).div(LAMPORTS_PER_SOL as f64)
-                    )),
+                    Cell::new(lamports_to_sol(deactivating).to_string()),
                 ])
                 .add_row(vec![
                     Cell::new("Credits Observed"),
-                    Cell::new(format!("{}", stake.credits_observed)),
+                    Cell::new(stake.credits_observed.to_string()),
                 ]);
 
             if lockup.is_in_force(&clock, None) {
                 table
                     .add_row(vec![
                         Cell::new("Lockup Epoch"),
-                        Cell::new(format!("{}", lockup.epoch)),
+                        Cell::new(lockup.epoch.to_string()),
                     ])
                     .add_row(vec![
                         Cell::new("Lockup Unix Timestamp"),
-                        Cell::new(format!("{}", lockup.unix_timestamp)),
+                        Cell::new(lockup.unix_timestamp.to_string()),
                     ])
                     .add_row(vec![
                         Cell::new("Lockup Custodian"),
@@ -274,7 +250,7 @@ async fn show_stake_account(ctx: &ScillaContext, pubkey: &Pubkey) -> anyhow::Res
         }
     }
 
-    println!("\n{}", style("STAKE ACCOUNT INFORMATION").green().bold());
+    println!("{}\n", style("STAKE ACCOUNT INFORMATION").green().bold());
     println!("{table}");
 
     Ok(())
