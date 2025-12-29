@@ -162,7 +162,7 @@ async fn show_stake_account(ctx: &ScillaContext, pubkey: &Pubkey) -> anyhow::Res
         .get_multiple_accounts(&[*pubkey, stake_history::id(), clock::id()])
         .await?;
 
-    let Some(Some(stake_account)) = accounts.get(0) else {
+    let Some(Some(stake_account)) = accounts.first() else {
         anyhow::bail!("Failed to get stake account");
     };
 
