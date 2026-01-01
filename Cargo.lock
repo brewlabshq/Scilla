@@ -1970,7 +1970,7 @@ dependencies = [
  "solana-keypair",
  "solana-message",
  "solana-nonce",
- "solana-pubkey 4.0.0",
+ "solana-pubkey 3.0.0",
  "solana-rpc-client",
  "solana-rpc-client-api",
  "solana-sdk-ids",
